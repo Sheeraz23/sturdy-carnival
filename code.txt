@@ -1,0 +1,446 @@
+from bs4 import BeautifulSoup #module for webscraping
+import requests #module for webscraping - for making requests to a specific website
+import lxml #module for webscraping - for parsing through the html code for specific tags
+from tkinter import * #module for GUI
+import os #module for opening applications - for notepad
+import sqlite3 #module for database management
+import webbrowser #module for opening chrome
+
+def open_stock_yahoo_window(ticker): #function for making the stock buttons that link to their respective yahoo pages
+  url = "https://finance.yahoo.com/quote/"+ticker+"/" #constructing the url
+  webbrowser.register("chrome",None,webbrowser.BackgroundBrowser("C://Program Files (x86)//Google//Chrome//Application//chrome.exe")) #code for exactly what the webbrowser library should do
+  webbrowser.get('chrome').open_new(url)#running the chrome code - so that when the button is pressed - then the chrome window is open with the url loaded
+
+def profit_label(): #profit window function
+  def Profit(): #function for calculating profit
+    global shares #using the shares global variable
+    global cash #using the cash global varible - the amount of cash the user has that is not tied within shares
+
+    networth = 0 #variable for cash value of stocks
+
+    for i in range(len(shares)): # going through shares array and getting cash value
+      price = price_(shares[i])[0]
+      networth = float(networth) + float(price)
+
+    networth+=cash
+    
+    return (networth - int(2000)) # since 2000 was the starting amount, the profit is the worth of the whole account minus 2000
+  
+  profit = Profit() #initialising local profit variable
+  
+  win_profit=Tk() #setting up the window to display profits
+  win_profit.geometry("400x400")
+  win_profit.title("profits")
+  
+  if profit > 0: #if profits are greater than 0, then display that number in green with a plus sign, eg. +2.23
+    profit_text = Label(win_profit, text=(str("+") + str(round(profit, 2))), font=('Times', 24), fg="light green")
+    profit_text.pack()
+  elif profit < 0:#if profits are less than 0, then display that number in red with a negative sign, eg. -2.23
+    profit_text = Label(win_profit,text=(str(round(profit,2))),font=('Times', 24), fg = "red").pack()
+  else: #if there is no profit, then just display 0 in black
+    profit_text = Label(win_profit,text="0",font=('Times', 24)).pack()
+
+def update(): #update function for the portfolio window
+  try: #it's a try function as, if there is nothing, then the program will try to delete something that's not there and raise an error correctly- but we don't want that
+    for widget in win.winfo_children():
+      widget.destroy()
+  except Exception as e:
+    print(e)
+    pass
+
+def storing(_shares_,_prices_): #this function is for grouping same elements together eg. ["AAPL","AAPL"] ==> ["AAPL",2]
+  shares = _shares_
+  prices = _prices_
+  
+  new_shares = []
+  new_prices = []
+  index = 1
+  for i in range(len(shares)):
+    try:
+      if shares[i+1] == shares[i]: # if the previous one is the same as the one after it, then we can increase the index to indicate more than one
+        index = index +1
+      else:#if the previous one is not the same as the one after it, this means that there are no more repeats - and we can now append the shares and prices to the list
+        new_shares.append(shares[i])
+        new_prices.append(prices[i])
+        new_shares.append(index)
+        new_prices.append(index)
+        index = 1
+    except IndexError: #if there is an index error, we still want to appeat the shares and prices to the list
+      new_shares.append(shares[i])
+      new_prices.append(prices[i])
+      new_shares.append(index)
+      new_prices.append(index)
+      pass
+
+  list_of_shares = new_shares
+  return list_of_shares,new_prices #returning the new shares and prices list, concise
+
+def bubblesort(shares): ##this function is for grouping same elements together eg. ["AAPL","AAPL","MSFT","AAPL"] ==> ["AAPL","AAPL","AAPL","MSFT"]
+#it's a standard bubble sort algorithm for sorting shares array and price array  
+  swapped = True
+  array = shares
+  pric = prices
+  while swapped != False:
+    swapped = False
+    for i in range(len(array)-1):
+            if array[i] > array[i+1]:
+              swapped = True
+              array[i], array[i+1] = array[i+1], array[i]
+              pric[i], pric[i+1] = pric[i+1], pric[i]
+  return array, pric #returning sorted shares and price array.
+
+def share_see(): #this code here is for displaying the portfolio window
+  
+  update() #removes old data
+  shares_alph_sort = bubblesort(shares)[0] #sorts data and gets shares
+  prices_shares_sort = bubblesort(shares)[1] #sorts data and gets prices
+  shares_ = storing(shares_alph_sort,prices_shares_sort)[0] #groups shares
+  prices_ =storing(shares_alph_sort,prices_shares_sort)[1] #groups prices
+  
+  
+  
+  label_shares = Label(win,text="shares:").grid(row=0,column=0) #put's the labels on the window
+  label_number = Label(win,text="number:").grid(row=0,column=1)
+  label_price = Label(win,text="Current price:").grid(row=0,column=2)
+  label_bought_at=Label(win,text="Bought at:").grid(row=0,column=3)
+  label_returns = Label(win,text="Change in price: ").grid(row=0,column=4)
+  label_profit_on_stock = Label(win,text="Profit on stock: ").grid(row=0,column=5)
+  
+  try:
+    shares_button = shares_alph_sort[::2] #these are shares without their adjacent numbers - eg ["AAPL","2"] >> ["AAPL"]
+    
+    new_shares_ = []
+    new_prices_ = []
+    for i in range(1,len(shares_),2):
+      new_shares_.append(shares_[i])
+    shares_ = new_shares_
+    prices_ = prices_[::2]
+    shares_button = list(dict.fromkeys(shares_button))#removed those extra stock links!
+    
+    print("shares:",shares)
+    print("new_shares_:",new_shares_)
+    print('prices_',prices_)
+    print("shares_button",shares_button)
+    
+  except IndexError:
+    pass
+
+  try:
+    for i in range(len(shares_button)): #this here is for the label information being displayed from the arrays
+      button = Button(win,text=shares_button[i],command=(lambda m=shares_button[i]: open_stock_yahoo_window(m))).grid(row=i+1,column=0) #lamda creates function, that prints out the button clicked
+      number = Label(win,text=shares_[i]).grid(row=i+1,column=1)
+      current = Label(win,text=price_(shares_button[i])[0]).grid(row=i+1,column=2)
+      price_bought_at = Label(win,text=prices_[i]).grid(row=i+1,column=3)
+      
+      change = float(price_(shares_button[i])[0])-float(prices_[i])
+      profit_particular = change* int(shares_[i])
+
+      if change>0: #if the change is positive, then the font is green
+        returns = Label(win,text=str(round(change,2)),fg="light green").grid(row=i+1,column=4)
+        profit_on_stock = Label(win,text=str(round(profit_particular,2)),fg="light green").grid(row=i+1,column=5)
+        
+      elif change<0: #if the change is negative, then the font is red
+        returns = Label(win,text=str(round(change,2)),fg="red").grid(row=i+1,column=4)
+        profit_on_stock = Label(win,text=str(round(profit_particular,2)),fg="red").grid(row=i+1,column=5)
+      else: #else the font is black
+        returns = Label(win, text=str(round(change, 2))).grid(row=i+1, column=4)
+        profit_on_stock = Label(win, text=str(round(profit_particular,2)))
+        profit_on_stock.grid(row=i+1, column=5)
+    
+  except IndexError:
+    pass
+
+
+
+
+
+shares = []
+prices = []
+cash = 2000
+
+window = Tk()
+window.geometry("400x400")
+window.title("The stock market simulator")
+
+def save():
+  global shares
+  global cash
+  global prices
+
+  def processing(): #placing array data into database
+    
+    new_shares = []
+    new_prices = []
+    index = 1
+
+
+    new_shares = storing(shares,prices)[0]
+    new_prices = storing(shares,prices)[1]
+    
+    username_= username.get()
+
+    
+    
+    with sqlite3.connect("leaderboard.db") as db: #initializing the database
+      cursor=db.cursor()
+    try:
+      cursor.execute("""DROP TABLE stuff""") #deleting the table, so we can put the newest data in the database
+    except:
+      pass 
+    cursor.execute("""CREATE TABLE IF NOT EXISTS 
+        stuff(
+        user text,
+        shares text,
+        num_shares int,
+        cash float,
+        bought_at float)
+        """)
+    db.commit() #creating new columns
+    for i in range(0,len(new_shares),2): 
+      cursor.execute("""INSERT INTO stuff(user,shares,num_shares,cash,bought_at) VALUES(?,?,?,?,?)""", (username_ ,new_shares[i] ,new_shares[i+1], cash, new_prices[i])) #inserting the relevant data
+      db.commit()
+
+    save_window.destroy()
+  
+  save_window = Tk()
+  save_window.title("Details")
+
+  username = Entry(save_window) #for the username entry window
+  username.pack()
+
+  submit_button_save = Button(save_window,text="save",command = processing) #when button pressed - the data is saved
+  submit_button_save.pack()
+
+
+  
+def retrieve(): #function for retrieving data from database
+  try:
+    global shares #these are the three things we will be changing, and they are needed to be changed throughout the code
+    global cash
+    global prices
+    
+    with sqlite3.connect("leaderboard.db") as db:
+        cursor=db.cursor()
+    a = cursor.execute("""SELECT * FROM stuff""") #getting everything from the database: "leaderboard"
+    results = a.fetchall()#fetching everything
+    print("results:",results)
+    
+    shares1 = []
+    for i in range(len(results)):#function for appending the data from the database into global variables
+       print(i)
+       for x in range(results[i][2]):
+         shares.append(results[i][1])
+         prices.append(results[i][4])
+    cash = results[0][3]
+    cash_l .config(text = ("cash in your account: " + str(round(cash,2))))#updating the cash label on the main window
+  except:
+    pass
+
+  return shares, cash
+
+def how_many_ticker(tick): # entering a ticker symbol, then counting how many there are in the shares array
+  global shares
+  loop1 = 0
+  for i in range(len(shares)):
+    if shares[i] == tick:
+      loop1+= 1
+  return loop1
+    
+  
+def new_window(): #similar to the "open_stock_yahoo_window" function - but this doesn't open particular stock links - instead it opens the general yahoo page
+  url = 'https://finance.yahoo.com/quote/'#it opens the general yahoo page, where the users can research stocks if they don't have any in mind
+  webbrowser.register('chrome',
+          None,
+          webbrowser.BackgroundBrowser("C://Program Files (x86)//Google//Chrome//Application//chrome.exe"))
+  webbrowser.get('chrome').open_new(url)
+
+def notepad(): #function for opening the notepad application, when the notepad button is pressed in the main window
+  try:
+    osCommandString = "notepad.exe"#name of the application to open
+    os.system(osCommandString)#opening it
+  except: #if the user doesn't have the application, instead of throwing an error, we can catch it and display it to the user-
+    #without halting the execution of the whole program
+    print("Notepad function doesn't work on your pc")
+
+def price_(ticker): #function for getting the pirce of a stock from the ticker symbol
+  url = "https://finance.yahoo.com/quote/"
+  url = url + ticker + "/" #constructing url with ticker
+  source = requests.get(url).text # sending a get request, so that we can get HTML code back
+  soup = BeautifulSoup(source, 'lxml')# setting up the "soup" - explained previously - to parse HTML
+
+  article = soup.find("div", class_="D(ib) Mend(20px)") # the tag where the price is stored it
+  title_title = soup.find("h1",class_="D(ib) Fz(18px)") #the tag where the full name of company is stored
+  
+  headline = article.text #extracting the text from the tag
+
+  headline_ar = [] 
+  #previously i explained that the price is stored as eg 1003+ , so were are just getting elements till first + or minus sign
+  # and that is the price
+  for i in range(len(headline)):
+    if headline[i] == "+" or headline[i]=="-":
+      break
+    else:
+      headline_ar.append(headline[i])
+  
+  price = "".join(headline_ar)#since I stored the price in an array, I'm joining up the elemts into a string
+  try:
+    price = price.replace(",","")# if there is a comma, take it out, as we want to work with numbers, not strings
+  except:
+    pass
+  print("price: ",price)# printing price and title
+  print("Title: ",title_title)
+  return price, title_title# returing price and title for use by other parts of the code
+
+    
+
+def apple():
+  pric = enter.get() #getting the ticker symbol within the entry box
+  pric = pric.upper()#converting it into upper case - that's what they are used as - in the HTML code
+  num = number_buy.get()#getting the number they want to buy in
+
+  try:
+    price = price_(pric)[0] #getting the price from the function above
+    num = int(num) #the application doesn't support fractional shares, so we need the number to buy in as integers
+  
+    if num=="": #if the user has entered nothing
+      warning.config(text = ("invalid amount entered")) #then the warning label changes from blank to this text
+    
+    label.config(text = ("Price of stock ", price))#price of stock is displayed
+    global cash# if transaction is successful, we need to change the cash variable and shares array globally
+    global shares
+    shares_ar = []
+    if (cash - (float(price)*num)) > 0: #if the price of the whole transaction leaves the cash in positive value, then we know
+      #that the user has enough
+      warning.config(text="")#there should be no warning
+      cash = cash - (float(price)*num) # the cash variable is changed globally
+  
+  
+      for i in range(num):
+        prices.append(price)# we need to append prices and shares array globally the amount of times, the user has bought share in
+        shares.append(pric)
+        
+      cash_l .config(text = ("cash in your account: " + str(round(cash,2)))) #changing the cash label to represent
+      #how much cash the user currently owns - this value has been rounded to 2 dp
+  
+    else:
+      warning.config(text = ("you don't have enough money to purchase this stock"))# if the transaction was unsuccessful,
+      #this meant that the user didn't have enough money to purchase the stock - so the warning text is changed to display this
+  
+    return cash
+  except: #if there was an error, we catch it and prevent it from halting the execution of the code, as we don't need to display
+    #them, because we have warning messages
+    pass
+
+
+   
+def sell_(): #selling function for when the user wants to sell their shares
+
+  global cash
+  global shares
+  global prices #when selling, we need to update these arrays
+  
+  num_to_sell = num_sell.get() 
+  num_to_sell = int(num_to_sell)#number of shares to sell
+  share_to_sell = sell_l.get()
+  share_to_sell=share_to_sell.upper()#the ticker of the shares to sell
+
+  number_of_shares = how_many_ticker(share_to_sell) #checking how many of the ticker symbol of shares the user is trying to sell, the user
+  #actually has
+  index = 0
+  found_share = False
+
+  if num_to_sell>number_of_shares: #if the user has less shares, than they are trying to sell, then warning message is displayed
+    warning.config(text="You don't have enough shares. ")
+  
+  elif len(shares) == 0:
+    warning.config(text="You haven't bought any shares yet")# if the user doesn't have any shares, then the warning message is displayed
+
+  else:
+    for loop in range(num_to_sell):
+      for i in range(len(shares)):
+        if share_to_sell==shares[i]:
+          index = i # this allows us to remove the shares and prices when stock is found 
+          found_share = True
+          break
+      if found_share == False:
+        warning.config(text="The share you have entered does not exist") #if the user has entered ticker symbol, that's not within the shares array
+        #then a warning message is displayed saying the ticker they entered doesn't exist
+      else:
+        pricea = price_(share_to_sell)[0]# getting current market price of stocks
+        cash = float(cash) + float(pricea) #getting the price of the stock to cash
+        shares.pop(index) #removing share from shares array
+        prices.pop(index) #removing price from prices array
+        
+        cash_l .config(text = ("cash in your account: " + str(round(cash,2)))) #updating cash within account
+
+  
+#this code below just initializes all the label information  
+win = Tk()
+win.geometry("400x400")
+win.title("shares:")
+
+share_to_buy_label = Label(window,text="Share to buy: ")
+share_to_buy_label.grid(row=0,column=0)
+
+enter = Entry(window)
+enter.grid(row=0,column=1)
+
+number_to_buy_label = Label(window,text="Number to buy: ")
+number_to_buy_label.grid(row=1,column=0)
+
+number_buy = Entry(window)
+number_buy.grid(row=1,column=1)
+
+submit = Button(window,text = "BUY",command=lambda:[apple(),share_see()])
+submit.grid(row=1,column=2)
+
+newwimp = Button(window,text="search stocks",command=new_window)
+newwimp.grid(row=3,column=1)
+
+noteb = Button(window,text="Notepad",command=notepad)
+noteb.grid(row=4,column=1)
+
+label = Label(window,text="click one of these buttons")
+label.grid(row=5,column=1)
+
+cash_l = Label(window,text = ("cash in your accound: " + str(cash)))
+cash_l.grid(row=6,column=1)
+
+warning = Label(window,text = "")
+warning.grid(row=7,column=0)
+
+hello = Label(window,text="")
+hello.grid(row=8,column=0)
+
+shares_to_sell_label = Label(window, text="Shares to sell: ")
+shares_to_sell_label.grid(row=9,column=0)
+
+sell_l = Entry(window,)
+sell_l.grid(row=9,column=1)
+
+number_to_sell = Label(window,text="Number to sell: ")
+number_to_sell.grid(row=10,column=0)
+
+num_sell = Entry(window)
+num_sell.grid(row=10,column=1)
+
+sell_b = Button(window,text="Sell share",command=lambda:[sell_(),share_see()])
+sell_b.grid(row=10,column=2)
+
+save_button = Button(window,text="save",command=save)
+save_button.grid(row=12,column=1)
+
+open_last = Button(window,text="open account",command=lambda:[retrieve(),share_see()])
+open_last.grid(row=13,column=1)
+
+profit_button = Button(window,text="Profit",command=profit_label)
+profit_button.grid(row=14,column=1)
+
+window.mainloop()
+
+
+
+
+
+
+
